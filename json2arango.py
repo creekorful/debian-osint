@@ -21,9 +21,10 @@ import sys
 import json
 
 
-def transform_group(raw_groups: list) -> list:
+def transform_group(raw_groups: list) -> (list, dict):
     print("There is {} groups to process".format(len(raw_groups)))
 
+    relations = {}
     groups = []
     for raw_group in raw_groups:
         # Base fields that are always present
@@ -39,16 +40,23 @@ def transform_group(raw_groups: list) -> list:
 
         groups.append(group)
 
+        # Relationship
+
     print("Groups processed!")
 
-    return groups
+    return groups, relations
 
 
-def transform_developer(raw_developers: list) -> list:
+def transform_developer(raw_developers: list) -> (list, dict):
     print("There is {} developers to process".format(len(raw_developers)))
 
+    relations = {}
     developers = []
     for raw_developer in raw_developers:
+        # skip inactive account
+        if 'accountStatus' in raw_developer and 'inactive' in raw_developer['accountStatus'][0]:
+            continue
+
         # Base fields that are always present
         developer = {
             '_id': raw_developer['uid'][0],
@@ -60,16 +68,36 @@ def transform_developer(raw_developers: list) -> list:
         # Optional fields
         if 'keyFingerPrint' in raw_developer:
             developer['gpg_key'] = raw_developer['keyFingerPrint']
+        if 'accountComment' in raw_developer:
+            developer['comment'] = raw_developer['accountComment'][0]
+        if 'accountStatus' in raw_developer:
+            developer['status'] = raw_developer['accountStatus'][0]
 
         developers.append(developer)
 
+        # Relationship
+        if 'supplementaryGid' in raw_developer:
+            for group in raw_developer['supplementaryGid']:
+                relations["developers_{}/groups_{}".format(developer['_id'], group)] = {
+                    '_from': "developers/{}".format(developer['_id']),
+                    '_to': "groups/{}".format(group)
+                }
+        if 'allowedHost' in raw_developer:
+            for server in raw_developer['allowedHost']:
+                server = server.split(' ')[0]
+                relations["developers_{}/servers_{}".format(developer['_id'], server)] = {
+                    '_from': "developers/{}".format(developer['_id']),
+                    '_to': "servers/{}".format(server)
+                }
+
     print("Developers processed!")
-    return developers
+    return developers, relations
 
 
-def transform_server(raw_servers: list) -> list:
+def transform_server(raw_servers: list) -> (list, dict):
     print("There is {} servers to process".format(len(raw_servers)))
 
+    relations = {}
     servers = []
     for raw_server in raw_servers:
         # Base fields that are always present
@@ -104,8 +132,16 @@ def transform_server(raw_servers: list) -> list:
 
         servers.append(server)
 
+        # Relationship
+        if 'allowedGroups' in raw_server:
+            for group in raw_server['allowedGroups']:
+                relations["servers_{}/groups_{}".format(server['_id'], group)] = {
+                    '_from': "servers/{}".format(server['_id']),
+                    '_to': "groups/{}".format(group)
+                }
+
     print("Servers processed!")
-    return servers
+    return servers, relations
 
 
 if __name__ == '__main__':
@@ -115,14 +151,21 @@ if __name__ == '__main__':
         ('servers.json', transform_server)
     ]
 
+    all_relations = {}
     for file, func in transformers:
         # Read source json
         with open(os.path.join(sys.argv[1], file)) as src_file:
             raw_data = json.load(src_file)
 
         # Call the transformer function
-        transformed_data = func(raw_data)
+        transformed_data, relations = func(raw_data)
+        all_relations = all_relations | relations
 
         # Write transformed json
         with open(os.path.join(sys.argv[2], file), 'w+') as dst_file:
             json.dump(transformed_data, dst_file)
+
+    # Write the relations
+    print("There is {} relations".format(len(all_relations)))
+    with open(os.path.join(sys.argv[2], "relations.json"), 'w+') as dst_file:
+        json.dump(list(all_relations.values()), dst_file)
