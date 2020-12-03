@@ -7,6 +7,7 @@
 # - developers.json - the list of debian developers dumped using ldap2json
 # - servers.json - the list of debian servers dumped using ldap2json
 # - groups.json - the list of debian groups dumped using ldap2json
+# - packages.json - the list of debian packages dumped using pkg2json
 #
 # example usage:
 # - ./json2arango.py /tmp/json-files /tmp/arango-files
@@ -14,6 +15,7 @@
 # where:
 # - /tmp/json-files is the directory where the raw JSON files are.
 # - /tmp/arango-files is the directory where the generated files will be placed
+
 import hashlib
 import os
 import sys
@@ -195,11 +197,30 @@ def transform_server_ssh_key(raw_servers: list) -> (list, dict):
     return keys, relations
 
 
+def transform_package(raw_packages: list) -> (list, dict):
+    packages = []
+    for raw_package in raw_packages:
+        # Base fields that are always present
+        package = {
+            '_key': raw_package['name'],
+            'name': raw_package['name'],
+        }
+
+        if 'version' in raw_package:
+            package['version'] = raw_package['version']
+
+        packages.append(package)
+
+    print("{} packages processed!".format(len(packages)))
+    return packages, {}
+
+
 if __name__ == '__main__':
     transformers = [
         ('groups.json', [('groups.json', transform_group)]),
         ('developers.json', [('developers.json', transform_developer), ('gpg-keys.json', transform_user_gpg_key)]),
-        ('servers.json', [('servers.json', transform_server), ('ssh-keys.json', transform_server_ssh_key)])
+        ('servers.json', [('servers.json', transform_server), ('ssh-keys.json', transform_server_ssh_key)]),
+        ('packages.json', [('packages.json', transform_package)])
     ]
 
     all_relations = {}
