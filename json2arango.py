@@ -29,8 +29,8 @@ def transform_group(raw_groups: list) -> list:
         # Base fields that are always present
         group = {
             '_id': raw_group['gid'][0],  # The name is used everywhere so it's easier than using the gid
-            'gid': raw_group['gidNumber'][0],
-            'name': raw_group['gid'][0]  # internal display name for Arango
+            'name': raw_group['gid'][0],  # internal display name for Arango
+            'gid': raw_group['gidNumber'][0]
         }
 
         # Optional fields
@@ -52,9 +52,9 @@ def transform_developer(raw_developers: list) -> list:
         # Base fields that are always present
         developer = {
             '_id': raw_developer['uid'][0],
+            'name': raw_developer['uid'][0],  # internal display name for Arango
             'cn': raw_developer['cn'][0],
-            'sn': raw_developer['sn'][0],
-            'name': raw_developer['uid'][0]  # internal display name for Arango
+            'sn': raw_developer['sn'][0]
         }
 
         # Optional fields
@@ -67,10 +67,52 @@ def transform_developer(raw_developers: list) -> list:
     return developers
 
 
+def transform_server(raw_servers: list) -> list:
+    print("There is {} servers to process".format(len(raw_servers)))
+
+    servers = []
+    for raw_server in raw_servers:
+        # Base fields that are always present
+        server = {
+            '_id': raw_server['hostname'][0],
+            'name': raw_server['hostname'][0],  # internal display name for Arango
+        }
+
+        # Optional fields
+        if 'distribution' in raw_server:
+            server['distribution'] = raw_server['distribution'][0]
+        if 'admin' in raw_server:
+            server['admin'] = raw_server['admin'][0]
+        if 'access' in raw_server:
+            server['access'] = raw_server['access'][0]
+        if 'purpose' in raw_server:
+            server['purpose'] = raw_server['purpose'][0]
+        if 'architecture' in raw_server:
+            server['architecture'] = raw_server['architecture'][0]
+        if 'sshRSAHostKey' in raw_server:
+            server['ssh_keys'] = raw_server['sshRSAHostKey']
+        if 'description' in raw_server:
+            server['description'] = raw_server['description'][0]
+        if 'ipHostNumber' in raw_server:
+            server['ips'] = raw_server['ipHostNumber']
+        if 'memory' in raw_server:
+            server['memory'] = raw_server['memory']
+        if 'disk' in raw_server:
+            server['disks'] = raw_server['disk'][0]
+        if 'sponsor' in raw_server:
+            server['sponsors'] = raw_server['sponsor']
+
+        servers.append(server)
+
+    print("Servers processed!")
+    return servers
+
+
 if __name__ == '__main__':
     transformers = [
         ('groups.json', transform_group),
-        ('developers.json', transform_developer)
+        ('developers.json', transform_developer),
+        ('servers.json', transform_server)
     ]
 
     for file, func in transformers:
