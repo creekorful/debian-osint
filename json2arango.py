@@ -24,9 +24,9 @@ import sys
 import json
 
 
-def transform_group(raw_groups: list) -> (list, dict):
+def transform_group(raw_groups: list) -> (dict, dict):
     relations = {}
-    groups = []
+    groups = {}
     for raw_group in raw_groups:
         # Base fields that are always present
         group = {
@@ -39,16 +39,16 @@ def transform_group(raw_groups: list) -> (list, dict):
         if 'description' in raw_group:
             group['description'] = raw_group['description'][0]
 
-        groups.append(group)
+        groups[group['_key']] = group
 
     print("{} groups processed!".format(len(groups)))
 
     return groups, relations
 
 
-def transform_developer(raw_developers: list) -> (list, dict):
+def transform_developer(raw_developers: list) -> (dict, dict):
     relations = {}
-    developers = []
+    developers = {}
     for raw_developer in raw_developers:
         # skip inactive account
         if 'accountStatus' in raw_developer:
@@ -75,7 +75,7 @@ def transform_developer(raw_developers: list) -> (list, dict):
         if 'accountStatus' in raw_developer:
             developer['status'] = raw_developer['accountStatus'][0]
 
-        developers.append(developer)
+        developers[developer['_key']] = developer
 
         # Relationship
         if 'supplementaryGid' in raw_developer:
@@ -105,9 +105,9 @@ def transform_developer(raw_developers: list) -> (list, dict):
     return developers, relations
 
 
-def transform_server(raw_servers: list) -> (list, dict):
+def transform_server(raw_servers: list) -> (dict, dict):
     relations = {}
-    servers = []
+    servers = {}
     for raw_server in raw_servers:
         # Base fields that are always present
         server = {
@@ -137,7 +137,7 @@ def transform_server(raw_servers: list) -> (list, dict):
         if 'sponsor' in raw_server:
             server['sponsors'] = raw_server['sponsor']
 
-        servers.append(server)
+        servers[server['_key']] = server
 
         # Relationship
         if 'allowedGroups' in raw_server:
@@ -152,9 +152,9 @@ def transform_server(raw_servers: list) -> (list, dict):
     return servers, relations
 
 
-def transform_user_gpg_key(raw_developers: list) -> (list, dict):
+def transform_user_gpg_key(raw_developers: list) -> (dict, dict):
     relations = {}
-    keys = []
+    keys = {}
     for raw_developer in raw_developers:
         if 'keyFingerPrint' in raw_developer:
             for raw_key in raw_developer['keyFingerPrint']:
@@ -162,15 +162,15 @@ def transform_user_gpg_key(raw_developers: list) -> (list, dict):
                     '_key': raw_key,
                     'name': raw_key,  # internal display name for Arango
                 }
-                keys.append(key)
+                keys[key['_key']] = key
 
     print("{} keys processed!".format(len(keys)))
     return keys, relations
 
 
-def transform_server_ssh_key(raw_servers: list) -> (list, dict):
+def transform_server_ssh_key(raw_servers: list) -> (dict, dict):
     relations = {}
-    keys = []
+    keys = {}
     for raw_server in raw_servers:
         if 'sshRSAHostKey' in raw_server:
             for raw_key in raw_server['sshRSAHostKey']:
@@ -188,7 +188,7 @@ def transform_server_ssh_key(raw_servers: list) -> (list, dict):
 
                     if len(parts) == 4:
                         key['comment'] = parts[3]
-                    keys.append(key)
+                    keys[key['_key']] = key
 
                     # Relationship
                     relations["servers_{}/ssh-keys_{}".format(raw_server['hostname'][0], key['_key'])] = {
@@ -201,8 +201,8 @@ def transform_server_ssh_key(raw_servers: list) -> (list, dict):
     return keys, relations
 
 
-def transform_package(raw_packages: list) -> (list, dict):
-    packages = []
+def transform_package(raw_packages: list) -> (dict, dict):
+    packages = {}
     for raw_package in raw_packages:
         # Base fields that are always present
         package = {
@@ -213,13 +213,13 @@ def transform_package(raw_packages: list) -> (list, dict):
         if 'version' in raw_package:
             package['version'] = raw_package['version']
 
-        packages.append(package)
+        packages[package['_key']] = package
 
     print("{} packages processed!".format(len(packages)))
     return packages, {}
 
 
-def transform_dm_permission(raw_permissions: list) -> (list, dict):
+def transform_dm_permission(raw_permissions: list) -> (dict, dict):
     relations = {}
 
     for raw_permission in raw_permissions:
@@ -236,7 +236,7 @@ def transform_dm_permission(raw_permissions: list) -> (list, dict):
             }
 
     print("{} DM permissions processed!".format(len(relations)))
-    return [], relations
+    return {}, relations
 
 
 if __name__ == '__main__':
@@ -259,10 +259,13 @@ if __name__ == '__main__':
             transformed_data, relations = func(raw_data)
             all_relations = all_relations | relations
 
+            # Convert to list
+            clean_transformed_data = list(transformed_data.values())
+
             # Write transformed json if needed
             if dst_file != '':
                 with open(os.path.join(sys.argv[2], dst_file), 'w+') as dst:
-                    json.dump(transformed_data, dst)
+                    json.dump(clean_transformed_data, dst)
 
     # Write the relations
     print("There is {} relations".format(len(all_relations)))
