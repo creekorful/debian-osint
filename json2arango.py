@@ -21,14 +21,8 @@ import sys
 import json
 
 
-def transform_group(group_file: str) -> list:
-    print("Transforming groups using file: {}".format(group_file))
-
-    # read the json
-    with open(group_file) as json_file:
-        raw_groups = json.load(json_file)
-
-    print("There is {} groups to proceed".format(len(raw_groups)))
+def transform_group(raw_groups: list) -> list:
+    print("There is {} groups to process".format(len(raw_groups)))
 
     groups = []
     for raw_group in raw_groups:
@@ -36,7 +30,7 @@ def transform_group(group_file: str) -> list:
         group = {
             '_id': raw_group['gid'][0],  # The name is used everywhere so it's easier than using the gid
             'gid': raw_group['gidNumber'][0],
-            'name': raw_group['gid'][0]
+            'name': raw_group['gid'][0]  # internal display name for Arango
         }
 
         # Optional fields
@@ -50,8 +44,43 @@ def transform_group(group_file: str) -> list:
     return groups
 
 
-if __name__ == '__main__':
-    groups = transform_group(os.path.join(sys.argv[1], "groups.json"))
+def transform_developer(raw_developers: list) -> list:
+    print("There is {} developers to process".format(len(raw_developers)))
 
-    with open(os.path.join(sys.argv[2], "groups.json"), 'w+') as outfile:
-        json.dump(groups, outfile)
+    developers = []
+    for raw_developer in raw_developers:
+        # Base fields that are always present
+        developer = {
+            '_id': raw_developer['uid'][0],
+            'cn': raw_developer['cn'][0],
+            'sn': raw_developer['sn'][0],
+            'name': raw_developer['uid'][0]  # internal display name for Arango
+        }
+
+        # Optional fields
+        if 'keyFingerPrint' in raw_developer:
+            developer['gpg_key'] = raw_developer['keyFingerPrint']
+
+        developers.append(developer)
+
+    print("Developers processed!")
+    return developers
+
+
+if __name__ == '__main__':
+    transformers = [
+        ('groups.json', transform_group),
+        ('developers.json', transform_developer)
+    ]
+
+    for file, func in transformers:
+        # Read source json
+        with open(os.path.join(sys.argv[1], file)) as src_file:
+            raw_data = json.load(src_file)
+
+        # Call the transformer function
+        transformed_data = func(raw_data)
+
+        # Write transformed json
+        with open(os.path.join(sys.argv[2], file), 'w+') as dst_file:
+            json.dump(transformed_data, dst_file)
