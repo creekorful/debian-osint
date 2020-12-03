@@ -22,8 +22,6 @@ import json
 
 
 def transform_group(raw_groups: list) -> (list, dict):
-    print("There is {} groups to process".format(len(raw_groups)))
-
     relations = {}
     groups = []
     for raw_group in raw_groups:
@@ -42,14 +40,12 @@ def transform_group(raw_groups: list) -> (list, dict):
 
         # Relationship
 
-    print("Groups processed!")
+    print("{} groups processed!".format(len(groups)))
 
     return groups, relations
 
 
 def transform_developer(raw_developers: list) -> (list, dict):
-    print("There is {} developers to process".format(len(raw_developers)))
-
     relations = {}
     developers = []
     for raw_developer in raw_developers:
@@ -73,8 +69,6 @@ def transform_developer(raw_developers: list) -> (list, dict):
         }
 
         # Optional fields
-        if 'keyFingerPrint' in raw_developer:
-            developer['gpg_key'] = raw_developer['keyFingerPrint']
         if 'accountComment' in raw_developer:
             developer['comment'] = raw_developer['accountComment'][0]
         if 'accountStatus' in raw_developer:
@@ -84,26 +78,30 @@ def transform_developer(raw_developers: list) -> (list, dict):
 
         # Relationship
         if 'supplementaryGid' in raw_developer:
-            for group in raw_developer['supplementaryGid']:
-                relations["developers_{}/groups_{}".format(developer['_key'], group)] = {
+            for raw_group in raw_developer['supplementaryGid']:
+                relations["developers_{}/groups_{}".format(developer['_key'], raw_group)] = {
                     '_from': "developers/{}".format(developer['_key']),
-                    '_to': "groups/{}".format(group)
+                    '_to': "groups/{}".format(raw_group)
                 }
         if 'allowedHost' in raw_developer:
-            for server in raw_developer['allowedHost']:
-                server = server.split(' ')[0]
+            for raw_server in raw_developer['allowedHost']:
+                server = raw_server.split(' ')[0]
                 relations["developers_{}/servers_{}".format(developer['_key'], server)] = {
                     '_from': "developers/{}".format(developer['_key']),
                     '_to': "servers/{}".format(server)
                 }
+        if 'keyFingerPrint' in raw_developer:
+            for raw_key in raw_developer['keyFingerPrint']:
+                relations["developers_{}/gpg_keys_{}".format(developer['_key'], raw_key)] = {
+                    '_from': "developers/{}".format(developer['_key']),
+                    '_to': "gpg_keys/{}".format(raw_key)
+                }
 
-    print("Developers processed!")
+    print("{} developers processed!".format(len(developers)))
     return developers, relations
 
 
 def transform_server(raw_servers: list) -> (list, dict):
-    print("There is {} servers to process".format(len(raw_servers)))
-
     relations = {}
     servers = []
     for raw_server in raw_servers:
@@ -141,20 +139,36 @@ def transform_server(raw_servers: list) -> (list, dict):
 
         # Relationship
         if 'allowedGroups' in raw_server:
-            for group in raw_server['allowedGroups']:
-                relations["groups_{}/servers_{}".format(group, server['_key'])] = {
-                    '_from': "groups/{}".format(group),
+            for raw_group in raw_server['allowedGroups']:
+                relations["groups_{}/servers_{}".format(raw_group, server['_key'])] = {
+                    '_from': "groups/{}".format(raw_group),
                     '_to': "servers/{}".format(server['_key'])
                 }
 
-    print("Servers processed!")
+    print("{} servers processed!".format(len(servers)))
     return servers, relations
+
+
+def transform_gpg_key(raw_developers: list) -> (list, dict):
+    relations = {}
+    keys = []
+    for raw_developer in raw_developers:
+        if 'keyFingerPrint' in raw_developer:
+            for raw_key in raw_developer['keyFingerPrint']:
+                key = {
+                    '_key': raw_key,
+                    'name': raw_key,  # internal display name for Arango
+                }
+                keys.append(key)
+
+    print("{} keys processed!".format(len(keys)))
+    return keys, relations
 
 
 if __name__ == '__main__':
     transformers = [
         ('groups.json', [('groups.json', transform_group)]),
-        ('developers.json', [('developers.json', transform_developer)]),
+        ('developers.json', [('developers.json', transform_developer), ('gpg-keys.json', transform_gpg_key)]),
         ('servers.json', [('servers.json', transform_server)])
     ]
 
