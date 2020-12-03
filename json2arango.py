@@ -14,7 +14,7 @@
 # where:
 # - /tmp/json-files is the directory where the raw JSON files are.
 # - /tmp/arango-files is the directory where the generated files will be placed
-
+import hashlib
 import os
 import sys
 
@@ -122,8 +122,6 @@ def transform_server(raw_servers: list) -> (list, dict):
             server['purpose'] = raw_server['purpose'][0]
         if 'architecture' in raw_server:
             server['architecture'] = raw_server['architecture'][0]
-        if 'sshRSAHostKey' in raw_server:
-            server['ssh_keys'] = raw_server['sshRSAHostKey']
         if 'description' in raw_server:
             server['description'] = raw_server['description'][0]
         if 'ipHostNumber' in raw_server:
@@ -149,7 +147,7 @@ def transform_server(raw_servers: list) -> (list, dict):
     return servers, relations
 
 
-def transform_gpg_key(raw_developers: list) -> (list, dict):
+def transform_user_gpg_key(raw_developers: list) -> (list, dict):
     relations = {}
     keys = []
     for raw_developer in raw_developers:
@@ -165,11 +163,43 @@ def transform_gpg_key(raw_developers: list) -> (list, dict):
     return keys, relations
 
 
+def transform_server_ssh_key(raw_servers: list) -> (list, dict):
+    relations = {}
+    keys = []
+    for raw_server in raw_servers:
+        if 'sshRSAHostKey' in raw_server:
+            for raw_key in raw_server['sshRSAHostKey']:
+                parts = raw_key.strip().split(' ')
+                if len(parts) >= 3:
+                    # hash key fingerprint using SHA-256 (cannot use key fingerprint as document key)
+                    key_id = hashlib.sha256(parts[1].encode('utf-8')).hexdigest()
+
+                    key = {
+                        '_key': key_id,
+                        'name': parts[2],  # internal display name for Arango
+                        'kind': parts[0],
+                        'fingerprint': parts[1],
+                    }
+
+                    if len(parts) == 4:
+                        key['comment'] = parts[3]
+                    keys.append(key)
+
+                    # Relationship
+                    relations["servers_{}/ssh_keys_{}".format(raw_server['hostname'][0], key['_key'])] = {
+                        '_from': "servers/{}".format(raw_server['hostname'][0]),
+                        '_to': "ssh_keys/{}".format(key['_key'])
+                    }
+
+    print("{} keys processed!".format(len(keys)))
+    return keys, relations
+
+
 if __name__ == '__main__':
     transformers = [
         ('groups.json', [('groups.json', transform_group)]),
-        ('developers.json', [('developers.json', transform_developer), ('gpg-keys.json', transform_gpg_key)]),
-        ('servers.json', [('servers.json', transform_server)])
+        ('developers.json', [('developers.json', transform_developer), ('gpg-keys.json', transform_user_gpg_key)]),
+        ('servers.json', [('servers.json', transform_server), ('ssh-keys.json', transform_server_ssh_key)])
     ]
 
     all_relations = {}
