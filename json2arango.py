@@ -8,6 +8,7 @@
 # - servers.json - the list of debian servers dumped using ldap2json
 # - groups.json - the list of debian groups dumped using ldap2json
 # - packages.json - the list of debian packages dumped using pkg2json
+# - dm-permissions.json - the list of debian DM permissions dumped using dm2json
 #
 # example usage:
 # - ./json2arango.py /tmp/json-files /tmp/arango-files
@@ -39,8 +40,6 @@ def transform_group(raw_groups: list) -> (list, dict):
             group['description'] = raw_group['description'][0]
 
         groups.append(group)
-
-        # Relationship
 
     print("{} groups processed!".format(len(groups)))
 
@@ -83,20 +82,23 @@ def transform_developer(raw_developers: list) -> (list, dict):
             for raw_group in raw_developer['supplementaryGid']:
                 relations["developers_{}/groups_{}".format(developer['_key'], raw_group)] = {
                     '_from': "developers/{}".format(developer['_key']),
-                    '_to': "groups/{}".format(raw_group)
+                    '_to': "groups/{}".format(raw_group),
+                    'kind': 'Is member of'
                 }
         if 'allowedHost' in raw_developer:
             for raw_server in raw_developer['allowedHost']:
                 server = raw_server.split(' ')[0]
                 relations["developers_{}/servers_{}".format(developer['_key'], server)] = {
                     '_from': "developers/{}".format(developer['_key']),
-                    '_to': "servers/{}".format(server)
+                    '_to': "servers/{}".format(server),
+                    'kind': 'Can access'
                 }
         if 'keyFingerPrint' in raw_developer:
             for raw_key in raw_developer['keyFingerPrint']:
-                relations["developers_{}/gpg_keys_{}".format(developer['_key'], raw_key)] = {
+                relations["developers_{}/gpg-keys_{}".format(developer['_key'], raw_key)] = {
                     '_from': "developers/{}".format(developer['_key']),
-                    '_to': "gpg_keys/{}".format(raw_key)
+                    '_to': "gpg-keys/{}".format(raw_key),
+                    'kind': 'Has key'
                 }
 
     print("{} developers processed!".format(len(developers)))
@@ -142,7 +144,8 @@ def transform_server(raw_servers: list) -> (list, dict):
             for raw_group in raw_server['allowedGroups']:
                 relations["groups_{}/servers_{}".format(raw_group, server['_key'])] = {
                     '_from': "groups/{}".format(raw_group),
-                    '_to': "servers/{}".format(server['_key'])
+                    '_to': "servers/{}".format(server['_key']),
+                    'kind': 'Can access'
                 }
 
     print("{} servers processed!".format(len(servers)))
@@ -188,9 +191,10 @@ def transform_server_ssh_key(raw_servers: list) -> (list, dict):
                     keys.append(key)
 
                     # Relationship
-                    relations["servers_{}/ssh_keys_{}".format(raw_server['hostname'][0], key['_key'])] = {
+                    relations["servers_{}/ssh-keys_{}".format(raw_server['hostname'][0], key['_key'])] = {
                         '_from': "servers/{}".format(raw_server['hostname'][0]),
-                        '_to': "ssh_keys/{}".format(key['_key'])
+                        '_to': "ssh-keys/{}".format(key['_key']),
+                        'kind': 'Has key'
                     }
 
     print("{} keys processed!".format(len(keys)))
@@ -215,12 +219,33 @@ def transform_package(raw_packages: list) -> (list, dict):
     return packages, {}
 
 
+def transform_dm_permission(raw_permissions: list) -> (list, dict):
+    relations = {}
+
+    for raw_permission in raw_permissions:
+        for raw_package in raw_permission['allow']:
+            relations["gpg-keys_{}/packages_{}".format(raw_permission['fingerprint'], raw_package['name'])] = {
+                '_from': "gpg-keys/{}".format(raw_permission['fingerprint']),
+                '_to': "packages/{}".format(raw_package['name']),
+                'kind': 'Has DM permission'
+            }
+            relations["gpg-keys_{}/packages_{}".format(raw_package['giver'], raw_package['name'])] = {
+                '_from': "gpg-keys/{}".format(raw_package['giver']),
+                '_to': "packages/{}".format(raw_package['name']),
+                'kind': 'Give DM permission'
+            }
+
+    print("{} DM permissions processed!".format(len(relations)))
+    return [], relations
+
+
 if __name__ == '__main__':
     transformers = [
         ('groups.json', [('groups.json', transform_group)]),
         ('developers.json', [('developers.json', transform_developer), ('gpg-keys.json', transform_user_gpg_key)]),
         ('servers.json', [('servers.json', transform_server), ('ssh-keys.json', transform_server_ssh_key)]),
-        ('packages.json', [('packages.json', transform_package)])
+        ('packages.json', [('packages.json', transform_package)]),
+        ('dm-permissions.json', [('', transform_dm_permission)])
     ]
 
     all_relations = {}
@@ -234,9 +259,10 @@ if __name__ == '__main__':
             transformed_data, relations = func(raw_data)
             all_relations = all_relations | relations
 
-            # Write transformed json
-            with open(os.path.join(sys.argv[2], dst_file), 'w+') as dst:
-                json.dump(transformed_data, dst)
+            # Write transformed json if needed
+            if dst_file != '':
+                with open(os.path.join(sys.argv[2], dst_file), 'w+') as dst:
+                    json.dump(transformed_data, dst)
 
     # Write the relations
     print("There is {} relations".format(len(all_relations)))
