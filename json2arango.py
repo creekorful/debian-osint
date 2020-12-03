@@ -153,24 +153,25 @@ def transform_server(raw_servers: list) -> (list, dict):
 
 if __name__ == '__main__':
     transformers = [
-        ('groups.json', transform_group),
-        ('developers.json', transform_developer),
-        ('servers.json', transform_server)
+        ('groups.json', [('groups.json', transform_group)]),
+        ('developers.json', [('developers.json', transform_developer)]),
+        ('servers.json', [('servers.json', transform_server)])
     ]
 
     all_relations = {}
-    for file, func in transformers:
+    for src_file, transformer in transformers:
         # Read source json
-        with open(os.path.join(sys.argv[1], file)) as src_file:
-            raw_data = json.load(src_file)
+        with open(os.path.join(sys.argv[1], src_file)) as src:
+            raw_data = json.load(src)
 
-        # Call the transformer function
-        transformed_data, relations = func(raw_data)
-        all_relations = all_relations | relations
+        # Call the transformer functions
+        for dst_file, func in transformer:
+            transformed_data, relations = func(raw_data)
+            all_relations = all_relations | relations
 
-        # Write transformed json
-        with open(os.path.join(sys.argv[2], file), 'w+') as dst_file:
-            json.dump(transformed_data, dst_file)
+            # Write transformed json
+            with open(os.path.join(sys.argv[2], dst_file), 'w+') as dst:
+                json.dump(transformed_data, dst)
 
     # Write the relations
     print("There is {} relations".format(len(all_relations)))
