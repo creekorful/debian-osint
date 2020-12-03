@@ -15,10 +15,9 @@
 # - /tmp/json-files is the directory where the raw JSON files are.
 # - /tmp/arango-files is the directory where the generated files will be placed
 
+import json
 import os
 import sys
-
-import json
 
 
 def transform_group(raw_groups: list) -> (list, dict):
@@ -29,7 +28,7 @@ def transform_group(raw_groups: list) -> (list, dict):
     for raw_group in raw_groups:
         # Base fields that are always present
         group = {
-            '_id': raw_group['gid'][0],  # The name is used everywhere so it's easier than using the gid
+            '_key': raw_group['gid'][0],  # The name is used everywhere so it's easier than using the gid
             'name': raw_group['gid'][0],  # internal display name for Arango
             'gid': raw_group['gidNumber'][0]
         }
@@ -59,7 +58,7 @@ def transform_developer(raw_developers: list) -> (list, dict):
 
         # Base fields that are always present
         developer = {
-            '_id': raw_developer['uid'][0],
+            '_key': raw_developer['uid'][0],
             'name': raw_developer['uid'][0],  # internal display name for Arango
             'cn': raw_developer['cn'][0],
             'sn': raw_developer['sn'][0]
@@ -78,15 +77,15 @@ def transform_developer(raw_developers: list) -> (list, dict):
         # Relationship
         if 'supplementaryGid' in raw_developer:
             for group in raw_developer['supplementaryGid']:
-                relations["developers_{}/groups_{}".format(developer['_id'], group)] = {
-                    '_from': "developers/{}".format(developer['_id']),
+                relations["developers_{}/groups_{}".format(developer['_key'], group)] = {
+                    '_from': "developers/{}".format(developer['_key']),
                     '_to': "groups/{}".format(group)
                 }
         if 'allowedHost' in raw_developer:
             for server in raw_developer['allowedHost']:
                 server = server.split(' ')[0]
-                relations["developers_{}/servers_{}".format(developer['_id'], server)] = {
-                    '_from': "developers/{}".format(developer['_id']),
+                relations["developers_{}/servers_{}".format(developer['_key'], server)] = {
+                    '_from': "developers/{}".format(developer['_key']),
                     '_to': "servers/{}".format(server)
                 }
 
@@ -102,7 +101,7 @@ def transform_server(raw_servers: list) -> (list, dict):
     for raw_server in raw_servers:
         # Base fields that are always present
         server = {
-            '_id': raw_server['hostname'][0],
+            '_key': raw_server['hostname'][0],
             'name': raw_server['hostname'][0],  # internal display name for Arango
         }
 
@@ -135,8 +134,8 @@ def transform_server(raw_servers: list) -> (list, dict):
         # Relationship
         if 'allowedGroups' in raw_server:
             for group in raw_server['allowedGroups']:
-                relations["servers_{}/groups_{}".format(server['_id'], group)] = {
-                    '_from': "servers/{}".format(server['_id']),
+                relations["servers_{}/groups_{}".format(server['_key'], group)] = {
+                    '_from': "servers/{}".format(server['_key']),
                     '_to': "groups/{}".format(group)
                 }
 
