@@ -10,6 +10,7 @@
 # See: https://packages.debian.org/unstable/allpackages?format=txt.gz
 
 import gzip
+import sys
 import urllib.request
 
 import json
@@ -35,6 +36,6 @@ if __name__ == '__main__':
 
                 packages.append(package)
 
-    with open('packages.json', 'w+') as outfile:
+    with open(sys.argv[1], 'w+') as outfile:
         json.dump(packages, outfile)
     print("successfully retrieved {} packages".format(len(packages)))

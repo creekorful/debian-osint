@@ -4,7 +4,7 @@
 # into a json file for further analysis.
 #
 # See: https://ftp-master.debian.org/dm.txt
-
+import sys
 import urllib.request
 
 import json
@@ -43,6 +43,6 @@ if __name__ == '__main__':
                     'giver': parts[1].replace('(', '').replace(')', '').replace(',', '')
                 })
 
-    with open('dm-permissions.json', 'w+') as outfile:
+    with open(sys.argv[1], 'w+') as outfile:
         json.dump(entries, outfile)
     print("successfully retrieved {} permissions".format(len(entries)))
