@@ -54,8 +54,15 @@ def transform_developer(raw_developers: list) -> (list, dict):
     developers = []
     for raw_developer in raw_developers:
         # skip inactive account
-        if 'accountStatus' in raw_developer and 'inactive' in raw_developer['accountStatus'][0]:
-            continue
+        if 'accountStatus' in raw_developer:
+            is_active = True
+            for inactive_status in ['inactive', 'retiring', 'memorial']:
+                if inactive_status in raw_developer['accountStatus'][0]:
+                    is_active = False
+                    break
+
+            if not is_active:
+                continue
 
         # Base fields that are always present
         developer = {
