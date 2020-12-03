@@ -15,9 +15,10 @@
 # - /tmp/json-files is the directory where the raw JSON files are.
 # - /tmp/arango-files is the directory where the generated files will be placed
 
-import json
 import os
 import sys
+
+import json
 
 
 def transform_group(raw_groups: list) -> (list, dict):
@@ -134,9 +135,9 @@ def transform_server(raw_servers: list) -> (list, dict):
         # Relationship
         if 'allowedGroups' in raw_server:
             for group in raw_server['allowedGroups']:
-                relations["servers_{}/groups_{}".format(server['_key'], group)] = {
-                    '_from': "servers/{}".format(server['_key']),
-                    '_to': "groups/{}".format(group)
+                relations["groups_{}/servers_{}".format(group, server['_key'])] = {
+                    '_from': "groups/{}".format(group),
+                    '_to': "servers/{}".format(server['_key'])
                 }
 
     print("Servers processed!")
