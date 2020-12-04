@@ -19,6 +19,7 @@
 
 import hashlib
 import os
+import re
 import sys
 
 import json
@@ -202,21 +203,55 @@ def transform_server_ssh_key(raw_servers: list) -> (dict, dict):
 
 
 def transform_package(raw_packages: list) -> (dict, dict):
+    relations = {}
     packages = {}
     for raw_package in raw_packages:
         # Base fields that are always present
         package = {
-            '_key': raw_package['name'],
-            'name': raw_package['name'],
+            '_key': raw_package['package'],
+            'name': raw_package['package'],
+            'priority': raw_package['priority'],
+            'section': raw_package['section'],
+            'maintainer': raw_package['maintainer'],
+            'description': raw_package['description'],
+            'version': raw_package['version'],
         }
-
-        if 'version' in raw_package:
-            package['version'] = raw_package['version']
 
         packages[package['_key']] = package
 
+        if 'source' in raw_package:
+            package_src = raw_package['source']
+            version = re.search('\(([0-9a-z.-]+)\)', package_src)
+            if version is not None:
+                package_src = package_src.replace(version.group(), '')  # Remove version from package name
+                version = version.group(1)  # Extract version
+
+            # Create source package
+            packages[package_src] = {
+                '_key': package_src,
+                'name': package_src,
+                'priority': raw_package['priority'],
+                'section': raw_package['section'],
+                'maintainer': raw_package['maintainer'],
+            }
+
+            # prevent from linking package to itself (todo why?)
+            if package_src == package['_key']:
+                continue
+
+            # Relationship
+            key = "packages_{}/packages_{}".format(package['_key'], package_src)
+            relations[key] = {
+                '_from': "packages/{}".format(package['_key']),
+                '_to': "packages/{}".format(package_src),
+                'kind': 'Build from',
+            }
+
+            if version is not None:
+                relations[key]['version'] = version
+
     print("{} packages processed!".format(len(packages)))
-    return packages, {}
+    return packages, relations
 
 
 def transform_dm_permission(raw_permissions: list) -> (dict, dict):
